@@ -7,7 +7,7 @@ from esgcet.util.settings import (
     STAC_item_properties,
     STAC_list_properties,
     STAC_proj_item_properties,
-    STAC_schema_versions,
+    STAC_schema_versions
 )
 from esgvoc.apps.jsg import json_schema_generator as jsg
 from esgcet.util import logger
@@ -121,7 +121,12 @@ class ESGSTACConverter:
 
     def citation_link_d(self, url):
 
-        return {"rel": "cite-as", "type": "application/json", "href": url}
+        return {
+            "rel": "cite-as",
+            "type": "application/json",
+            "href": url,
+            "title": "Citation URL",
+        }
 
     def convert2stac(self, json_data):
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -237,6 +242,40 @@ class ESGSTACConverter:
             func(f"forcing max lat {north_degrees} into range (90)")
             north_degrees = 90.
 
+        if east_degrees < west_degrees:
+            geometry = {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [[
+                        [west_degrees, south_degrees],
+                        [180.0, south_degrees],
+                        [180.0, north_degrees],
+                        [west_degrees, north_degrees],
+                        [west_degrees, south_degrees],
+                    ]],
+                    [[
+                        [-180.0, south_degrees],
+                        [east_degrees, south_degrees],
+                        [east_degrees, north_degrees],
+                        [-180.0, north_degrees],
+                        [-180.0, south_degrees],
+                    ]],
+                ],
+            }
+            bbox = [-180.0, south_degrees, 180.0, north_degrees]
+        else:
+            geometry = {
+                "type": "Polygon",
+                "coordinates": [[
+                    [west_degrees, south_degrees],
+                    [east_degrees, south_degrees],
+                    [east_degrees, north_degrees],
+                    [west_degrees, north_degrees],
+                    [west_degrees, south_degrees],
+                ]],
+            }
+            bbox = [west_degrees, south_degrees, east_degrees, north_degrees]
+
         dt_start = dataset_doc.get("datetime_start", None)
         dt_end = dataset_doc.get("datetime_end", None)
         properties = {"size": size, "created": now, "updated": now, "retracted": False}
@@ -250,7 +289,7 @@ class ESGSTACConverter:
             properties["start_datetime"] = "1850-01-01T00:00:00Z"
             properties["end_datetime"] = "1850-01-01T00:00:01Z"
 
-        if namespace == "cmip6plus":
+        if namespace in {"cmip6", "cmip6plus"}:
             collection_key_name = "CMIP6"
         else:
             collection_key_name = collection
@@ -294,23 +333,23 @@ class ESGSTACConverter:
             elif v is not None:
                 properties[nk] = v
         try:
-            esgvoc_version = jsg.get_schema_version(namespace)
+            schema_version = jsg.get_schema_version(namespace)
         except AttributeError:
-            esgvoc_version = ""
-            self.publog.warning(
-                "esgvoc json schema generator does not support schema version lookup"
+            self.publog.error(
+                "Installed esgvoc does not support schema version lookup for %s",
+                namespace,
             )
-        except Exception:
-            esgvoc_version = ""
-            self.publog.warning(
-                f"{namespace} not in esgvoc db, did you remember to 'use' this?"
+            return None
+        except Exception as error:
+            self.publog.error(
+                "Could not resolve the %s STAC schema version from esgvoc: %s",
+                namespace,
+                error,
             )
+            return None
 
-        # Prefer the schema version from the user's selected esgvoc database.
-        # Fall back to configured versions only when esgvoc cannot provide one.
-        sc_version = esgvoc_version or STAC_schema_versions.get(collection, "")
-        if sc_version == "":
-            self.publog.error(f"Collection {namespace} not configured")
+        if not schema_version:
+            self.publog.error("esgvoc returned no STAC schema version for %s", namespace)
             return None
 
         item = {
@@ -318,7 +357,7 @@ class ESGSTACConverter:
             "stac_version": "1.1.0",
             "stac_extensions": [
                 # "https://stac-extensions.github.io/cmip6/v3.0.0/schema.json",
-                f"https://esgf.github.io/stac-transaction-api/{namespace}/{sc_version}/schema.json",
+                f"https://esgf.github.io/stac-transaction-api/{namespace}/{schema_version}/schema.json",
                 # "http://host.docker.internal/cmip6/v2.0.2/schema.json",
                 "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json",
                 # "http://host.docker.internal/alternate-assets/v1.2.0/schema.json",
@@ -326,19 +365,8 @@ class ESGSTACConverter:
                 # "http://host.docker.internal/file/v2.1.0/schema.json"
             ],
             "id": item_id,
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [
-                    [
-                        [west_degrees, south_degrees],
-                        [east_degrees, south_degrees],
-                        [east_degrees, north_degrees],
-                        [west_degrees, north_degrees],
-                        [west_degrees, south_degrees],
-                    ]
-                ],
-            },
-            "bbox": [west_degrees, south_degrees, east_degrees, north_degrees],
+            "geometry": geometry,
+            "bbox": bbox,
             "collection": collection,
             "links": [
                 {
@@ -369,7 +397,7 @@ class ESGSTACConverter:
         if "citation_url" in dataset_doc:
             item["links"].append(self.citation_link_d(dataset_doc["citation_url"]))
         else:
-            print("WARNING no Citation url")
+            self.publog.warning("No citation URL found for %s", item_id)
 
         if "reference_file" in dataset_doc:
             item["assets"]["reference_file"] = dataset_doc["reference_file"]

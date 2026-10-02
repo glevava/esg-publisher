@@ -31,6 +31,7 @@ dependencies = [
     "pyyaml",
     "cc-plugin-wcrp>=2.0.0",
     "pystac_client",
+    "jsonschema>=4.18",
     "kerchunk",
     "virtualizarr",
     "esgvoc>=5.0.1",
@@ -62,6 +63,7 @@ esgunpublish = "esgcet.cli.esgunpublish:main"
 esgcet = "esgcet.cli:app"
 esglogin = "esgcet.cli.esglogin:main"
 esgadd = "esgcet.cli.esgstacaddrep:main"
+esgstac = "esgcet.cli.esgstac:main"
 
 [project.urls]
 Homepage = "http://esgf.github.io/"

@@ -57,6 +57,9 @@ generated/
 /sources/
 *.sav
 
+# Local test datasets
+/CMIP6/
+
 # notebook checkpoints
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/

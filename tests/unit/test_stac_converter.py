@@ -133,18 +133,22 @@ class TestESGSTACConverter:
         assert item["id"] == cmip6_dataset_doc["instance_id"]
         assert item["collection"] == "CMIP6"
 
-    def test_convert_falls_back_to_configured_schema_version(
+    def test_convert_returns_none_when_esgvoc_schema_version_is_unavailable(
         self, monkeypatch, stac_config, cmip6_dataset_doc, cmip6_file_doc
     ):
-        """Test configured schema version fallback when esgvoc cannot provide one."""
-        monkeypatch.delattr(stac_converter.jsg, "get_schema_version", raising=False)
-        monkeypatch.setitem(stac_converter.STAC_schema_versions, "CMIP6", "v3.0.4")
+        """Do not build an item with a guessed schema URL when esgvoc lookup fails."""
+
+        def fail_schema_lookup(_namespace):
+            raise RuntimeError("CMIP6 vocabulary is not configured")
+
+        monkeypatch.setattr(
+            stac_converter.jsg, "get_schema_version", fail_schema_lookup
+        )
 
         converter = ESGSTACConverter(stac_config)
         item = converter.convert2stac([cmip6_dataset_doc, cmip6_file_doc])
 
-        assert item is not None
-        assert item["stac_extensions"][0].endswith("/cmip6/v3.0.4/schema.json")
+        assert item is None
 
     def test_convert_cmip6_properties(self, stac_config, cmip6_dataset_doc, cmip6_file_doc):
         """Test CMIP6 properties are correctly mapped."""
@@ -274,6 +278,7 @@ class TestESGSTACConverter:
         cite_links = [l for l in item["links"] if l["rel"] == "cite-as"]
         assert len(cite_links) == 1
         assert cite_links[0]["href"] == "https://doi.org/10.22033/ESGF/TEST"
+        assert cite_links[0]["title"] == "Citation URL"
 
     def test_convert_no_assets_returns_none(self, stac_config, cmip6_dataset_doc):
         """Test that conversion returns None if no assets can be created."""

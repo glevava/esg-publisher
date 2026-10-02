@@ -5,6 +5,21 @@ For the current version number of the ESGF Publisher, and release notes for rece
 
 See below for release notes for versions up to v5.2.2.  Although there is some overlap with what is on readthedocs, the list below is not updated with the most recent releases.
 
+### Generate a STAC Item for review
+
+`esgstac` scans the NetCDF files in a dataset version directory and writes the STAC Item JSON without publishing or indexing it. The directory must be named `v<version>`, follow the project's DRS layout, and be under a path configured in `data_roots`.
+
+```bash
+esgstac /data/CMIP6/DCPP/MRI/MRI-ESM2-0/dcppA-hindcast/s2017-r1i1p1f1/Amon/psl/gn/v20210114 \
+   --project cmip6 \
+   --config ~/.esg/esg.yaml \
+   --output item.json
+```
+
+The command reads `project`, `data_node`, `data_roots`, `user_project_config`, `test`, `disable_citation`, and `stac_config.stac_api` from YAML. `--project`, `--data-node`, and `--stac-api` override their corresponding values. The dataset PID and citation URL are generated locally using the publisher's existing rules; no PID service or STAC Transaction API is contacted. Without `--output`, the Item is printed to stdout.
+
+Add `--valid` to validate the generated Item against the ESGF project schema URL in its `stac_extensions`. It prints `PASS` on success, or `FAIL` followed by each validation or schema-fetch error, and exits with status 1 on failure. When used with `--output`, the generated Item is saved even if validation fails.
+
 **Pull Requests**:  please set `integration` as the _base_ branch.  PRs set to `main` will be closed.  
 
 ----

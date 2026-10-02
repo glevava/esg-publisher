@@ -7,6 +7,7 @@ from netCDF4 import Dataset
 from esgcet.args import PublisherArgs
 from esgcet.generic_netcdf import GenericPublisher
 from esgcet.stac.stac_converter import ESGSTACConverter
+from esgcet.stac.stac_preview import stac_item_from_directory
 
 import pathlib
 import json
@@ -54,6 +55,29 @@ def test_generic_publisher(data_dir, test_map_cmip6):
     generic_pub.extract_method(map_json)
 
     out_json = generic_pub.mk_dataset(map_json)
+
+
+def test_stac_item_from_dataset_directory(data_dir, test_map_cmip6):
+    map_fields = test_map_cmip6.read_text().splitlines()[0].split(" | ")
+    dataset_dir = pathlib.Path(
+        map_fields[1].replace("$TEST_DATA", str(data_dir))
+    ).parent
+
+    item = stac_item_from_directory(
+        dataset_dir,
+        "CMIP6",
+        "test.data.node",
+        {str(data_dir): ""},
+        stac_config={"stac_api": "https://example.test/api"},
+    )
+
+    assert item["type"] == "Feature"
+    assert item["id"].startswith("CMIP6.DCPP.MRI.MRI-ESM2-0")
+    assert item["bbox"] == [-180.0, -90.0, 180.0, 90.0]
+    assert item["assets"]
+    assert item["properties"]["cmip6:pid"].startswith("hdl:21.14100/")
+    citation_link = next(link for link in item["links"] if link["rel"] == "cite-as")
+    assert citation_link["title"] == "Citation URL"
 
 
 def test_cmip7_missing_parent_attributes_are_not_reused(data_dir, tmp_path, test_map_cmip7):
