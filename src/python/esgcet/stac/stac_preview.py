@@ -89,6 +89,10 @@ def _project_drs(project: str, user_project_config: dict | None) -> list[str]:
         return DRS[project_key]
 
     project_config = user_project_config or {}
+    clone = project_config.get("clone_project")
+    if isinstance(clone, str) and clone.lower() in DRS:
+        return DRS[clone.lower()]
+
     for key in (project, project_key, project.upper()):
         configured = project_config.get(key, {})
         if "DRS" in configured:

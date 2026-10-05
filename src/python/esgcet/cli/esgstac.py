@@ -56,6 +56,11 @@ def main() -> int:
     if not data_node:
         parser.error("--data-node is required when data_node is not set in the config")
 
+    user_project_config = config.get("user_project_config") or {}
+    cmip6_clone = config.get("cmip6_clone")
+    if isinstance(cmip6_clone, str) and project.lower() == cmip6_clone.lower():
+        user_project_config = {**user_project_config, "clone_project": "cmip6"}
+
     stac_config = config.get("stac_config") or {}
     if args.stac_api:
         stac_config = {**stac_config, "stac_api": args.stac_api}
@@ -77,7 +82,7 @@ def main() -> int:
             data_node,
             config.get("data_roots", {}),
             stac_config=stac_config,
-            user_project_config=config.get("user_project_config"),
+            user_project_config=user_project_config,
             index_node=config.get("index_node", ""),
             test=test,
             disable_citation=disable_citation,

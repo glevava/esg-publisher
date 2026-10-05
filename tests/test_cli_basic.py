@@ -5,6 +5,7 @@ import pytest
 
 from esgcet.cli import esgstac as stac_cli
 from esgcet.stac import stac_preview
+from esgcet.util.settings import DRS
 
 CLI_COMMANDS = [
     'esgpublish',
@@ -105,3 +106,35 @@ def test_esgstac_valid_flag_reports_result(
     assert capsys.readouterr().out == expected_output
     assert build_options["test"] is False
     assert build_options["disable_citation"] is False
+
+
+def test_esgstac_uses_cmip6_drs_for_configured_clone(
+    monkeypatch, tmp_path
+):
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        "project: cmip6plus\n"
+        "data_node: test.node\n"
+        "data_roots: {}\n"
+        "cmip6_clone: cmip6plus\n"
+        "user_project_config:\n"
+        "  cmip6plus: {}\n",
+        encoding="utf-8",
+    )
+    build_options = {}
+
+    def fake_build(*args, **kwargs):
+        build_options.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["esgstac", str(tmp_path), "--config", str(config), "--output", str(tmp_path / "item.json")],
+    )
+    monkeypatch.setattr(stac_cli, "stac_item_from_directory", fake_build)
+
+    assert stac_cli.main() == 0
+    assert stac_preview._project_drs(
+        "cmip6plus", build_options["user_project_config"]
+    ) == DRS["cmip6"]
