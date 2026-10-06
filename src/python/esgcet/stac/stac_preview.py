@@ -109,6 +109,7 @@ def _map_rows(
     project: str,
     data_roots: dict,
     user_project_config: dict | None,
+    fake_checksum: bool = False,
 ) -> list[list]:
     matching_roots = []
     for root in data_roots:
@@ -151,17 +152,21 @@ def _map_rows(
     rows = []
     for path in netcdf_files:
         stat = path.stat()
-        digest = sha256()
-        with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
+        if fake_checksum:
+            checksum = "0" * 64
+        else:
+            digest = sha256()
+            with path.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+            checksum = digest.hexdigest()
         rows.append(
             [
                 dataset_version_id,
                 str(path.resolve()),
                 stat.st_size,
                 f"mod_time={stat.st_mtime}",
-                f"checksum={digest.hexdigest()}",
+                f"checksum={checksum}",
                 "checksum_type=SHA256",
             ]
         )
@@ -179,12 +184,14 @@ def stac_item_from_directory(
     index_node: str = "",
     test: bool = False,
     disable_citation: bool = False,
+    fake_checksum: bool = False,
 ) -> dict:
     """Scan a dataset version directory and return its ESGF-style STAC Item.
 
     The directory must be the version level of a DRS tree under a configured
-    ``data_roots`` path. Files are scanned as NetCDF and their SHA-256 checksums
-    are calculated for the STAC file assets.
+    ``data_roots`` path. By default, SHA-256 checksums are calculated for the
+    STAC file assets. ``fake_checksum`` uses a placeholder for metadata-only
+    schema validation and does not verify file integrity.
     """
 
     dataset_directory = Path(directory).expanduser().resolve()
@@ -201,7 +208,11 @@ def stac_item_from_directory(
         )
     }
     map_rows = _map_rows(
-        dataset_directory, project, normalized_roots, user_project_config
+        dataset_directory,
+        project,
+        normalized_roots,
+        user_project_config,
+        fake_checksum=fake_checksum,
     )
     scan_handler = ESGPubNC4Handler(log.return_logger("STAC preview scan"))
     scan_result = scan_handler.nc4_load(map_rows)

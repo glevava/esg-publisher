@@ -7,6 +7,7 @@ from netCDF4 import Dataset
 from esgcet.args import PublisherArgs
 from esgcet.generic_netcdf import GenericPublisher
 from esgcet.stac.stac_converter import ESGSTACConverter
+from esgcet.stac import stac_preview
 from esgcet.stac.stac_preview import stac_item_from_directory
 
 import pathlib
@@ -78,6 +79,32 @@ def test_stac_item_from_dataset_directory(data_dir, test_map_cmip6):
     assert item["properties"]["cmip6:pid"].startswith("hdl:21.14100/")
     citation_link = next(link for link in item["links"] if link["rel"] == "cite-as")
     assert citation_link["title"] == "Citation URL"
+
+
+def test_stac_item_from_dataset_directory_can_skip_checksum(
+    data_dir, test_map_cmip6, monkeypatch
+):
+    map_fields = test_map_cmip6.read_text().splitlines()[0].split(" | ")
+    dataset_dir = pathlib.Path(
+        map_fields[1].replace("$TEST_DATA", str(data_dir))
+    ).parent
+    monkeypatch.setattr(
+        stac_preview,
+        "sha256",
+        lambda: pytest.fail("SHA-256 should not be computed in metadata-only mode"),
+    )
+
+    item = stac_item_from_directory(
+        dataset_dir,
+        "CMIP6",
+        "test.data.node",
+        {str(data_dir): ""},
+        stac_config={"stac_api": "https://example.test/api"},
+        fake_checksum=True,
+    )
+
+    asset = next(iter(item["assets"].values()))
+    assert asset["file:checksum"] == "1220" + "0" * 64
 
 
 def test_cmip7_missing_parent_attributes_are_not_reused(data_dir, tmp_path, test_map_cmip7):

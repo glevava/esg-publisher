@@ -20,6 +20,8 @@ The command reads `project`, `data_node`, `data_roots`, `user_project_config`, `
 
 Add `--valid` to validate the generated Item against the ESGF project schema URL in its `stac_extensions`. It prints `PASS` on success, or `FAIL` followed by each validation or schema-fetch error, and exits with status 1 on failure. When used with `--output`, the generated Item is saved even if validation fails.
 
+For metadata-only validation on large datasets, combine `--valid --fake-checksum` to skip reading file contents for SHA-256 calculation. The item receives placeholder checksums and the command warns that file integrity was not checked; do not use this mode to publish the generated item. `--fake-checksum` is rejected unless `--valid` is also specified.
+
 **Pull Requests**:  please set `integration` as the _base_ branch.  PRs set to `main` will be closed.  
 
 ----

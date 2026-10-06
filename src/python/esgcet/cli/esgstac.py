@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+import sys
 
 import yaml
 
@@ -44,7 +45,19 @@ def main() -> int:
         action="store_true",
         help="Validate the generated Item against its referenced ESGF schema",
     )
+    parser.add_argument(
+        "--fake-checksum",
+        action="store_true",
+        help="Skip file hashing and use a placeholder; requires --valid",
+    )
     args = parser.parse_args()
+    if args.fake_checksum and not args.valid:
+        parser.error("--fake-checksum can only be used with --valid")
+    if args.fake_checksum:
+        print(
+            "WARNING: placeholder checksums are used; file integrity is not checked.",
+            file=sys.stderr,
+        )
 
     with args.config.open(encoding="utf-8") as config_file:
         config = yaml.safe_load(config_file) or {}
@@ -86,6 +99,7 @@ def main() -> int:
             index_node=config.get("index_node", ""),
             test=test,
             disable_citation=disable_citation,
+            fake_checksum=args.fake_checksum,
         )
     finally:
         logging.disable(previous_log_disable)
