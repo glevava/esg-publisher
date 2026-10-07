@@ -53,11 +53,6 @@ def main() -> int:
     args = parser.parse_args()
     if args.fake_checksum and not args.valid:
         parser.error("--fake-checksum can only be used with --valid")
-    if args.fake_checksum:
-        print(
-            "WARNING: placeholder checksums are used; file integrity is not checked.",
-            file=sys.stderr,
-        )
 
     with args.config.open(encoding="utf-8") as config_file:
         config = yaml.safe_load(config_file) or {}
